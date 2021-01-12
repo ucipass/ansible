@@ -157,6 +157,12 @@
     - "mkdir -p /home/aarato/.kube"
     - "cp  /etc/kubernetes/admin.conf /home/aarato/.kube/config"
     - "chown aarato:aarato /home/aarato/.kube/config"
+  - name: add kubectl bash completion
+    become: false
+    lineinfile:
+      path: ~/.bashrc
+      line: source <(kubectl completion bash)
+      state: present
   - name: Add Calico Networking
     become: false
     command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
