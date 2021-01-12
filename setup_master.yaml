@@ -1,11 +1,11 @@
 ---
-- hosts: nodes
+- hosts: all
   become: true
   tasks:
   - name: Update and upgrade apt packages
     become: true
     apt:
-      upgrade: "no"
+      upgrade: "yes"
       update_cache: yes
       cache_valid_time: 86400 #One day
   - name: Comment out swap in fstab since kubernetes can't work with swap enabled
@@ -38,6 +38,9 @@
       - curl
       - software-properties-common 
       - gnupg2
+#
+# DOCKER INSTALL SECTION
+#
   - name: Add Docker's official GPG key                                 
     become: yes
     apt_key:
@@ -61,20 +64,14 @@
       - containerd.io=1.2.13-2
       - docker-ce=5:19.03.11~3-0~ubuntu-focal
       - docker-ce-cli=5:19.03.11~3-0~ubuntu-focal
- # - name: Set up the Docker daemon
- #   become: yes
- #   blockinfile:
- #     path: /etc/docker/daemon.json
- #     create: yes
- #     block: |
- #       {
- #         #"exec-opts": ["native.cgroupdriver=systemd"],
- #         "log-driver": "json-file",
- #         "log-opts": {
- #         "max-size": "100m"
- #         },
- #         "storage-driver": "overlay2"
- #       }
+  - name: Hold containerd,docker-ce, docker-ce-cli
+    dpkg_selections:
+      name: "{{item}}"
+      selection: hold
+    with_items:
+      - containerd.io
+      - docker-ce
+      - docker-ce-cli
   - name: Ensure systemd is set for cgroupdriver
     become: yes
     lineinfile:
@@ -90,16 +87,15 @@
     become: yes
     systemd:
       daemon_reload: yes
-  - name: Enable Docker Service
-    become: yes
-    systemd:
-      name: docker.service
-      state: started
-      enabled: yes
-
+#  - name: Enable Docker Service
+#    become: yes
+#    systemd:
+#      name: docker.service
+#      state: started
+#      enabled: yes
 
 #
-# KUBEADM SECTION
+# KUBEADM INSTALL SECTION
 #
   - name: Letting iptables see bridged traffic
     become: yes
@@ -134,10 +130,33 @@
       upgrade: "no"
       update_cache: yes
       cache_valid_time: 86400 #One day
-  - name: Install Kubeadm
+  - name: Install Kubeadm, Kubectl, Kubelet
     become: true
     apt:
       pkg:
-      - kubelet
+      - "kubeadm=1.19.4-00"
+      - "kubectl=1.19.4-00"
+      - "kubelet=1.19.4-00"
+  - name: Hold kubeadm
+    dpkg_selections:
+      name: "{{item}}"
+      selection: hold
+    with_items:
       - kubeadm
       - kubectl
+      - kubelet
+  - name: initialize the cluster
+    shell: kubeadm init --pod-network-cidr=10.254.0.0/16
+    register: result
+    until: result.stdout.find("Your Kubernetes master has initialized successfully!") != -1
+    retries: 0
+    delay: 60
+  - name: Setup kubeconfig for local user
+    command: "{{ item }}"
+    with_items:
+    - "mkdir -p /home/aarato/.kube"
+    - "cp  /etc/kubernetes/admin.conf /home/aarato/.kube/config"
+    - "chown aarato:aarato /home/aarato/.kube/config"
+  - name: Add Calico Networking
+    become: false
+    command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
