@@ -1,0 +1,35 @@
+---
+- hosts: master
+  become: true
+  vars:
+    node_token_file: "/var/lib/rancher/k3s/server/node-token"
+  tasks:
+  - name: Check if K3S installed
+    stat:
+      path: "{{node_token_file}}"
+    register: k3s_exists
+  - name: Install K3S master
+    ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
+    when: k3s_exists.stat.exists == False
+  - name: GET Master Token
+    slurp:
+      src: "{{ node_token_file }}"
+    register: token_string
+    when: k3s_exists.stat.exists == True
+  - name: SHOW K3S Master Token
+    debug:
+      msg: "{{token_string}}"
+    when: k3s_exists.stat.exists == True
+  - name: GET K3S Version
+    ansible.builtin.shell: k3s -version
+    register: k3s_version
+    when: k3s_exists.stat.exists == True
+  - name: SHOW K3S Version
+    debug:
+      msg: "{{k3s_version.stdout_lines[0]}}"
+    when: k3s_exists.stat.exists == True
+  - name: SET VARIABLE master_token
+    set_fact:
+        master_token: "{{ token_string.content }}"    
+    when: k3s_exists.stat.exists == True
+

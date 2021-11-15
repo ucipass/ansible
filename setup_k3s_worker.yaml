@@ -1,0 +1,53 @@
+---
+- hosts: master
+  become: true
+  vars:
+    node_token_file: "/var/lib/rancher/k3s/server/node-token"
+  tasks:
+  - name: Check if K3S installed
+    stat:
+      path: "{{node_token_file}}"
+    register: k3s_exists
+  - name: Get Master Token
+    slurp:
+      src: "{{ node_token_file }}"
+    register: token_string
+    when: k3s_exists.stat.exists == True
+  - name: Set variable master_token
+    set_fact:
+        master_token: "{{ token_string.content | b64decode | trim }}"    
+    when: k3s_exists.stat.exists == True
+  - name: Set variable master_node
+    set_fact:
+        master_node: "{{ ansible_ssh_host }}"    
+    when: k3s_exists.stat.exists == True
+
+- hosts: workers
+  become: true
+  vars:
+    k3s_agent: "/usr/local/bin/k3s"
+  tasks:
+  - name: Check if K3S installed
+    stat:
+      path: "{{k3s_agent}}"
+    register: k3s_agent_exists
+  - name: SET variable master_token
+    set_fact:
+        master_token: "{{hostvars[ groups['master'][0] ]['master_token']}}"
+    when: k3s_agent_exists.stat.exists == False      
+  - name: SET variable master_token
+    set_fact:
+        master_node: "{{hostvars[ groups['master'][0] ]['master_node']}}"
+    when: k3s_agent_exists.stat.exists == False      
+  - name: SET variable k3s agent install string
+    set_fact:
+        agent_install_string: 'curl -sfL https://get.k3s.io | K3S_URL="https://{{master_node}}:6443" K3S_TOKEN="{{master_token}}" sh - '
+    when: k3s_agent_exists.stat.exists == False      
+  - name: SHOW k3s agent install string
+    debug:
+      msg: "{{agent_install_string}}"
+    when: k3s_agent_exists.stat.exists == False      
+  - name: Install K3S worker
+    ansible.builtin.shell: "{{agent_install_string}}"
+    register: results
+    when: k3s_agent_exists.stat.exists == False      
