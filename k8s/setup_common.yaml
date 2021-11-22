@@ -1,0 +1,48 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Update and upgrade(optional) apt packages
+    become: true
+    apt:
+      upgrade: "no"
+      update_cache: yes
+      cache_valid_time: 86400 #One day
+  - name: Comment out swap in fstab since kubernetes can't work with swap enabled
+    become: true
+    replace:
+      path: /etc/fstab
+      regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+      replace: '# \1'
+    register: swap
+  - name: Disable SWAP, if needed, since kubernetes can't work with swap enabled
+    shell: |
+      swapoff --all
+    when: swap.changed
+  - name: Set hostnames
+    become: true
+    hostname:
+      name: "{{inventory_hostname}}"
+    register: hostname
+  - name: reboot if needed 
+    become: true
+    reboot:
+      reboot_timeout: 240  
+    when: hostname.changed
+  - name: Install a list of packages to allow HTTPS pull for repositories
+    become: yes
+    apt:
+      pkg:
+      - apt-transport-https
+      - ca-certificates 
+      - curl
+      - software-properties-common 
+      - gnupg2
+      - vim
+      - open-iscsi
+  - name: Enable ISCSId Service
+    become: yes
+    systemd:
+      name: iscsid.service
+      state: started
+      enabled: yes

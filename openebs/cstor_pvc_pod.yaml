@@ -1,0 +1,39 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cstor-pvc
+spec:
+  storageClassName: cstor-csi-disk
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+  namespace: default
+spec:
+  containers:
+  - name: busybox
+    resources:
+      limits:
+        memory: 512Mi
+        cpu: "800m"
+      requests:
+        memory: 256Mi
+    command:
+       - sh
+       - -c
+       - 'date >> /mnt/openebs-csi/date.txt; hostname >> /mnt/openebs-csi/hostname.txt; sync; sleep 5; sync; tail -f /dev/null;'
+    image: busybox
+    imagePullPolicy: Always
+    volumeMounts:
+    - mountPath: /mnt/openebs-csi
+      name: demo-vol
+  volumes:
+  - name: demo-vol
+    persistentVolumeClaim:
+      claimName: cstor-pvc      

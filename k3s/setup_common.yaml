@@ -5,7 +5,7 @@
   - name: Update and upgrade(optional) apt packages
     become: true
     apt:
-      upgrade: "yes"
+      upgrade: "no"
       update_cache: yes
       cache_valid_time: 86400 #One day
   - name: Comment out swap in fstab since kubernetes can't work with swap enabled

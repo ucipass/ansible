@@ -1,0 +1,66 @@
+---
+- hosts: master
+  become: true
+  vars:
+    node_token_file: "/var/lib/rancher/k3s/server/node-token"
+  tasks:
+  - name: Check if K3S installed first path
+    stat:
+      path: "{{node_token_file}}"
+    register: k3s_exists
+  - name: Install K3S master
+    ansible.builtin.shell: curl -sfL https://get.k3s.io |  sh -s - --write-kubeconfig-mode 644
+    when: k3s_exists.stat.exists == False
+  - name: Check if K3S installed first path
+    stat:
+      path: "{{node_token_file}}"
+    register: k3s_exists
+  - name: GET K3S Version
+    ansible.builtin.shell: k3s -version
+    register: k3s_version
+    when: k3s_exists.stat.exists == True
+  - name: SHOW K3S Version
+    debug:
+      msg: "{{k3s_version.stdout_lines[0]}}"
+    when: k3s_exists.stat.exists == True
+  - name: Creates .kube directory
+    file:
+      path: "/home/{{ ansible_env.SUDO_USER or ansible_user_id }}/.kube"
+      state: directory   
+      owner: "{{ ansible_env.SUDO_USER or ansible_user_id }}"
+      group: "{{ ansible_env.SUDO_USER or ansible_user_id }}"      
+  - name: Copy file with owner and permissions
+    ansible.builtin.copy:
+      remote_src: yes
+      src: "/etc/rancher/k3s/k3s.yaml"
+      dest: "/home/{{ ansible_env.SUDO_USER or ansible_user_id }}/.kube/config"
+      owner: "{{ ansible_env.SUDO_USER or ansible_user_id }}"
+      group: "{{ ansible_env.SUDO_USER or ansible_user_id }}"      
+      mode: '0600'
+  - name: add kubectl bash completion
+    lineinfile:
+      path: "/home/{{ ansible_env.SUDO_USER or ansible_user_id }}/.bashrc"
+      line: source <(kubectl completion bash)
+      state: present
+  - name: Add kubectl k alias for user
+    lineinfile:
+      path=/home/{{ ansible_env.SUDO_USER or ansible_user_id }}/.bashrc
+      line="alias k=kubectl"
+      owner={{ ansible_env.SUDO_USER or ansible_user_id }}
+      regexp="^alias k=kubectl$"
+      state=present
+      insertafter=EOF
+      create=True      
+  - name: Add k alias completion
+    lineinfile:
+      path=/home/{{ ansible_env.SUDO_USER or ansible_user_id }}/.bashrc
+      line="complete -F __start_kubectl k"
+      owner={{ ansible_env.SUDO_USER or ansible_user_id }}
+      regexp="^complete -F __start_kubectl k$"
+      state=present
+      insertafter=EOF
+      create=True      
+  - name: Install Helm 3 snap --classic with option
+    community.general.snap:
+      name: helm
+      classic: yes

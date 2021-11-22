@@ -1,0 +1,4 @@
+---
+- import_playbook: k8s/setup_common.yaml
+- import_playbook: k8s/setup_master.yaml
+- import_playbook: k8s/setup_workers.yaml

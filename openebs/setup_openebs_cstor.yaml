@@ -1,0 +1,27 @@
+---
+- hosts: master
+  become: true
+  vars:
+    node_token_file: "/var/lib/rancher/k3s/server/node-token"
+  tasks:
+  - name: Add a OpenEBS Helm repository
+  # helm repo add openebs https://openebs.github.io/charts
+  # helm repo update  
+    community.kubernetes.helm_repository:
+      name: openebs
+      repo_url: https://openebs.github.io/charts  
+  - name: Install OpenEBS helm chart with default values.
+  # helm install openebs --namespace openebs openebs/openebs --set cstor.enabled=true --create-namespace
+    community.kubernetes.helm:
+      name: openebs
+      values:
+        cstor.enabled: true      
+      kubeconfig: "/home/{{ ansible_env.SUDO_USER or ansible_user_id }}/.kube/config"
+      chart_ref: openebs/openebs
+      release_namespace: openebs
+      create_namespace: true
+  - name: Collect block storage device on workers
+    shell: kubectl get bd -n openebs | grep -E 'node972|node973|node974' | awk '{ print $1 }'
+    register: block_devices
+  - debug:
+      msg: "{{block_devices}}"

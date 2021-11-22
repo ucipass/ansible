@@ -1,0 +1,35 @@
+#
+# CHECK BLOCK DEVICES
+# kubectl get bd -n openebs
+# CHECK STORAGE POOL - THIS IS GONNA TAKE A WHILE
+# kubectl get cspc -n openebs
+#
+#
+apiVersion: cstor.openebs.io/v1
+kind: CStorPoolCluster
+metadata:
+ name: cstor-disk-pool
+ namespace: openebs
+spec:
+ pools:
+   - nodeSelector:
+       kubernetes.io/hostname: "node972"
+     dataRaidGroups:
+       - blockDevices:
+           - blockDeviceName: "blockdevice-7c180b3237f05cc1c30777dad1af3f0c"
+     poolConfig:
+       dataRaidGroupType: "stripe"
+   - nodeSelector:
+       kubernetes.io/hostname: "node973"
+     dataRaidGroups:
+       - blockDevices:
+           - blockDeviceName: "blockdevice-2c1a083932d7ea5b284165a4c4285797"
+     poolConfig:
+       dataRaidGroupType: "stripe"
+   - nodeSelector:
+       kubernetes.io/hostname: "node974"
+     dataRaidGroups:
+       - blockDevices:
+           - blockDeviceName: "blockdevice-67651165b4109a7a7232dbbd00e93060"
+     poolConfig:
+       dataRaidGroupType: "stripe"
